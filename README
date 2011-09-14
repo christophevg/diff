@@ -1,0 +1,8 @@
+diff.php
+A diff implementation in plain PHP.
+
+---
+
+I needed a way to display a diff between two versions of some content of an
+editable website. Taking the problem offline and trying to find an algorithm
+to do this, was a great learning experience.
