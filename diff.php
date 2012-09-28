@@ -31,6 +31,10 @@ class diff {
     $this->prepareLines();
     return $this;
   }
+  
+  public function differs() {
+    return count($this->lines) > 0;
+  }
 
   public function getNextLine() {
     if( $this->line >= count($this->lines)-1 ) { return false; }
@@ -52,8 +56,10 @@ class diff {
     $o = 0; $n = 0;
     while( $i <= $last ) {
       if( $this->actions[$i] == self::ADD ) {
-        $this->lines[] = new diffLine( 'add', $this->newLines[$n], null, $n );
-        $n++;
+        if( $n < count($this->newLines) ) {
+          $this->lines[] = new diffLine( 'add', $this->newLines[$n], null, $n );
+          $n++;
+        }
         $i++;
       } elseif( $this->actions[$i] == self::DEL ) {
         $this->lines[] = new diffLine( 'del', $this->oldLines[$o], $o, null );
@@ -62,7 +68,7 @@ class diff {
       } else { // SAME
         // find end of SAME block
         $end = $i;
-        while( $end <= $last && $this->actions[$end+1] == self::SAME ) { $end++; }
+        while( $end < $last && $this->actions[$end+1] == self::SAME ) { $end++; }
         if( $this->context == self::ALL || ($end - $i) < $this->context * 2 ) {
           // all of SAME block is context, nothing to skip
           while( $i<=$end ) {
@@ -71,19 +77,39 @@ class diff {
             $o++; $n++;
           }
         } else { // context / skip / context
-          for( $c=0; $c<$this->context; $c++ ) {
-            $this->lines[] = new diffLine( 'context', $this->newLines[$n], $o, $n );
-            $o++; $n++;
-            $i++;
+          if( $n != 0 ) { // don't display initial context
+            for( $c=0; $c<$this->context; $c++ ) {
+              $this->lines[] = new diffLine( 'context', $this->newLines[$n], $o, $n );
+              $o++; $n++;
+              $i++;
+            }
+          } else {
+            $o += $this->context;
+            $n += $this->context;
+            $i += $this->context;
           }
-          $this->lines[] = new diffLine( 'skip', '...', null, null );
+
           $skip = $end - $i - $this->context + 1;
+
+          if( $n == $this->context && ($n + $skip) >= $last ) {
+             // don't skip between no changes
+          } else {
+            $this->lines[] = new diffLine( 'skip', '...', null, null );
+          }
+
           $o += $skip; $n += $skip;
           $i += $skip;
-          for( $c=0; $c<$this->context; $c++ ) {
-            $this->lines[] = new diffLine( 'context', $this->newLines[$n], $o, $n );
-            $o++; $n++;
-            $i++;
+
+          if( $n < $last ) {  // don't display final context
+            for( $c=0; $c<$this->context; $c++ ) {
+              $this->lines[] = new diffLine( 'context', $this->newLines[$n], $o, $n );
+              $o++; $n++;
+              $i++;
+            }
+          } else {
+            $o += $this->context;
+            $n += $this->context;
+            $i += $this->context;
           }
         }
       }
@@ -124,8 +150,10 @@ class diff {
         while( $depth * 2 < $dels + $adds ) {
 
           // find out how many lines must be deleted to reach the same line
-          $odist = $this->look_for( $this->newLines[$new_idx+$depth],
-                                    $this->oldLines, $depth, $old_idx );
+          if( $new_idx+$depth < count( $this->newLines ) ) {
+            $odist = $this->look_for( $this->newLines[$new_idx+$depth],
+                                      $this->oldLines, $depth, $old_idx );
+          }
 
           // find out how many lines should be added to reach the same line
           if( $old_idx+$depth >= count($this->oldLines) ) {
@@ -193,7 +221,7 @@ class diffLine {
   
   public function __construct($type, $string, $oldIndex, $newIndex) {
     $this->type     = $type;
-    $this->string   = $string;
+    $this->string   = htmlspecialchars(isset($string) ? $string : "");
     $this->oldIndex = $oldIndex + 1;
     $this->newIndex = $newIndex + 1;
   }
